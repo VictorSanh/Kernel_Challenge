@@ -1,108 +1,60 @@
 ## Data manipulation
 import numpy as np
-
-## Performance metrics
-import time
-
-## Kernel SVM requirements
-from cvxopt import matrix
-from cvxopt import solvers
-from scipy.spatial.distance import cdist
 from numpy.core.defchararray import not_equal
 
+def hamming_distance(source, target):
+    """Return the Hamming distance between equal-length sequences"""
+    return np.count_nonzero(not_equal(source,target))
 
-def build_kernel(arr1, arr2, kernel_fct):
-    """Builds the kernel matrix from numpy array @arr and kernel function @kernel_fct. V1, unnefficient"""
-    try:
-        assert len(arr1) > 0
-        assert len(arr2) > 0
-    except AssertionError:
-        print('At least one of the argument arrays is empty')
-    if arr1.ndim == 1:
-        arr1 = arr1.reshape((len(arr1),1))
-    if arr2.ndim == 1:
-        arr2 = arr2.reshape((len(arr2),1))
-    K = cdist(arr1, arr2, lambda u, v: kernel_fct(list(u[0]),list(v[0])))
-    return K
+def hamming_kernel(source, target):
+    """Return the value of a K(s,t) where K is kernel defined from Hamming distance"""
+    if len(source) != len(target):
+        raise ValueError("Undefined for sequences of unequal length")
+    if len(source) == 0:
+        raise ValueError("Strings are empty")
+    return 1 - (hamming_distance(source, target)*1.0/len(source))
 
+def levenshtein_distance(source, target):
+    if len(source) < len(target):
+        return levenshtein(target, source)
 
-## Kernel methods parent class
-class kernelMethod():
-    def __init__(self):
-        return 0
+    # So now we have len(source) >= len(target).
+    if len(target) == 0:
+        return len(source)
 
+    # We call tuple() to force strings to be used as sequences
+    # ('c', 'a', 't', 's') - numpy uses them as values by default.
+    source = np.array(tuple(source))
+    target = np.array(tuple(target))
 
-## Kernel SVM method
-class kernelSVM(kernelMethod):
-    def __init__(self, lbda=0.1, solver='cvxopt'):
-        self.lbda = lbda
-        self.solver = solver
-        self.data = None
-        self.alpha = None
-        self.kernel_fct = None
-    
-    def format_labels(self, labels):
-        try:
-            assert len(np.unique(labels)) == 2
-        except AssertionError:
-            print('Error: Labels provided are not binary')
-        lm,lM = np.min(labels), np.max(labels)
-        l = (labels==lM).astype(int) - (labels==lm).astype(int)
-        return l
-    
-    def run(self, data, labels, kernel_fct):
-        """Trains the kernel SVM on data and labels"""
-        n_samples = labels.shape[0]
-        # Turning labels into ±1
-        labels = self.format_labels(labels)
-        # Binding kernel fct and data as attribute for further predictions
-        self.kernel_fct = kernel_fct
-        self.data = data
-        # Building matrices for solving dual problem
-        print('Building kernel matrix from {0:d} samples...'.format(n_samples))
-        tick = time.time()
-        K = build_kernel(data, data, kernel_fct)
-        print('...done in {0:.2f}s'.format(time.time()-tick))
-        d = np.diag(labels)
-        P = matrix((-1.0/(2*self.lbda))*d*K*d, tc='d')
-        q = matrix(np.ones((n_samples,1)), tc='d')
-        G1 = -np.eye(n_samples)
-        G2 = np.eye(n_samples)
-        G = matrix(np.vstack((G1,G2)), tc='d')
-        h1 = np.zeros((n_samples,1))
-        h2 = (1.0/n_samples)*np.ones((n_samples,1))
-        h = matrix(np.vstack((h1,h2)), tc='d')
-        # Construct the QP, invoke solver
-        sol = solvers.qp(P,q,G,h)
-        # Extract optimal value and solution
-        dual = sol['x']
-        # Solving dual problem via solver
-        self.alpha = (1.0/(2*self.lbda))*(d @ dual)
-    
-    def predict(self, data):
-        """Predict labels for data"""
-        try:
-            assert self.alpha is not None
-            assert self.kernel_fct is not None
-        except AssertionError:
-            print('Error: No successful training recorded')
-        # Build sv alpha and sv K(x_i(new_data), x_j(ref))
-        sv_ind = np.nonzero(self.alpha)[0]
-        sv_alpha = self.alpha[sv_ind]
-        sv_K = build_kernel(data, self.data[sv_ind], self.kernel_fct)
-        # Use supvec alpha and supvec K to compute predictions
-        return sv_K @ sv_alpha
-    
-    def assess(self, data, labels, metrics):
-        """Provides the performance of the algorithm on some test data"""
-        try:
-            assert len(data) == len(labels)
-        except AssertionError:
-            print('Error: Data and labels have different length')
-        labels = self.format_labels(labels).reshape((len(labels),1))
-        preds = self.predict(data)
-        m = {}
-        if metrics is not None:
-            for metric in metrics:
-                m[metric.name] = metric.measure(preds, labels)
-        return preds, m
+    # We use a dynamic programming algorithm, but with the
+    # added optimization that we only need the last two rows
+    # of the matrix.
+    previous_row = np.arange(target.size + 1)
+    for s in source:
+        # Insertion (target grows longer than source):
+        current_row = previous_row + 1
+
+        # Substitution or matching:
+        # Target and source items are aligned, and either
+        # are different (cost of 1), or are the same (cost of 0).
+        current_row[1:] = np.minimum(
+                current_row[1:],
+                np.add(previous_row[:-1], target != s))
+
+        # Deletion (target grows shorter than source):
+        current_row[1:] = np.minimum(
+                current_row[1:],
+                current_row[0:-1] + 1)
+
+        previous_row = current_row
+
+    return previous_row[-1]
+
+def levenshtein_kernel(source, target):
+    """Return the value of a K(s,t) where K is kernel defined from Hamming distance"""
+    if len(source) != len(target):
+        raise ValueError("Undefined for sequences of unequal length")
+    if len(source) == 0:
+        raise ValueError("Strings are empty")
+    return 1 - (levenshtein_distance(source, target)*1.0/len(source))
