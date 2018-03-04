@@ -7,13 +7,20 @@ import time
 ## Kernel SVM requirements
 from cvxopt import matrix
 from cvxopt import solvers
+solvers.options['show_progress'] = False
 import mosek
 
 from scipy.spatial.distance import cdist
 
+## Importing self-made fcts
+from metrics import *
+
+## Debugging
+import pdb
+
 
 ## General class to build a kernel matrix
-def build_kernel(arr1, arr2, kernel_fct, stringsData=True):
+def build_kernel(arr1, arr2, kernel_fct, stringsData=True, verbose=True):
     """Builds the kernel matrix from numpy array @arr and kernel function @kernel_fct. V1, unnefficient"""
     try:
         assert len(arr1) > 0
@@ -24,14 +31,22 @@ def build_kernel(arr1, arr2, kernel_fct, stringsData=True):
         arr1 = arr1.reshape((len(arr1),1))
     if arr2.ndim == 1:
         arr2 = arr2.reshape((len(arr2),1))
+    
+    if verbose:
+        print('Building kernel matrix from {0:d}x{1:d} samples...'.format(len(arr1),len(arr2)))
+    tick = time.time()
+    
     if stringsData:
         K = cdist(arr1, arr2, lambda u, v: kernel_fct(list(u[0]),list(v[0])))
     else:
         K = cdist(arr1, arr2, kernel_fct)
+    
+    if verbose:
+        print('...done in {0:.2f}s'.format(time.time()-tick))
     return K
 
 
-## 'Default' linear classifier (on numeric data only)
+## 'Default' linear classifier (on numeric data only)
 def linear_prod(x1, x2):
     t1 = np.ravel(x1)
     t2 = np.ravel(x2)
@@ -40,13 +55,69 @@ def linear_prod(x1, x2):
     return np.dot(t1,t2)
 
 
-## Kernel methods parent class
+## General method for k-fold cross validation
+def kfold(data, labels, n_folds, train_method, pred_method, format_labels, metric, stringsData, **kwargs):
+    try:
+        n_folds > 1
+    except AssertionError:
+        print('Need more than one fold')
+
+    try:
+        assert len(data) == len(labels)
+    except AssertionError:
+        print('Error: Data and labels have different length')  
+    
+    print('Engaging n-fold cross validation with {0:d} folds on {1:d} items'.format(n_folds, len(data)))    
+    fold_size = int(len(data)/n_folds)
+    perm = np.random.permutation(len(data))
+    data = data[perm]
+    labels = labels[perm]
+
+    res = []
+    for fold in range(n_folds):
+        val_idx = range(fold*fold_size,(fold+1)*fold_size)
+        val_data = np.array(data[val_idx])
+        val_labels = np.array(labels[val_idx])
+
+        train_data = np.array([element for i, element in enumerate(data) if i not in val_idx])
+        train_labels = np.array([element for i, element in enumerate(labels) if i not in val_idx])
+
+        train_method(train_data, train_labels, **kwargs)
+
+        preds = pred_method(val_data, stringsData)
+        res.append(metric.measure(np.ravel(preds), format_labels(val_labels)))
+        print('Fold {0:d}, {1:s}: {2:.2f}'.format(fold,metric.name,res[fold]))
+
+    print('Done! Average {0:s} is {1:.2f}'.format(metric.name,np.mean(res)))
+    return np.mean(res)
+
+
+###################################
+### KERNEL METHODS PARENT CLASS ###
+###################################
+
 class kernelMethod():
     def __init__(self):
         return 0
 
+    def format_labels(self, labels):
+        return labels
 
-## Kernel SVM method
+    def train(self, data, labels, kernel_fct=None, solver=None, stringsData=True):
+        return
+
+    def predict(self, data):
+        return
+
+    def assess(self, data, labels, n_folds=1, kernel_fct=None, solver=None, stringsData=True, metric=m_binary):
+        if n_folds > 1:
+            return kfold(data, labels, n_folds, self.train, self.predict, self.format_labels, metric, stringsData, kernel_fct=kernel_fct, solver=solver)    
+
+
+##################
+### KERNEL SVM ###
+##################
+
 class kernelSVM(kernelMethod):
     def __init__(self, lbda=0.1, solver='cvxopt'):
         self.lbda = lbda
@@ -64,9 +135,9 @@ class kernelSVM(kernelMethod):
         l = (labels==lM).astype(int) - (labels==lm).astype(int)
         return l
     
-    def run(self, data, labels, kernel_fct=None, solver=None, stringsData=True):
+    def train(self, data, labels, kernel_fct=None, solver=None, stringsData=True):
         """Trains the kernel SVM on data and labels"""
-        # Default kernel will be linear (only works in for finite-dim floats space)
+        # Default kernel will be linear (only works in for finite-dim floats space)
         if kernel_fct is None:
             kernel_fct = linear_prod
         n_samples = labels.shape[0]
@@ -76,10 +147,7 @@ class kernelSVM(kernelMethod):
         self.kernel_fct = kernel_fct
         self.data = data
         # Building matrices for solving dual problem
-        print('Building kernel matrix from {0:d} samples...'.format(n_samples))
-        tick = time.time()
         K = build_kernel(data, data, kernel_fct, stringsData) 
-        print('...done in {0:.2f}s'.format(time.time()-tick))
         d = np.diag(labels)
         P = matrix(2.0*K, tc='d')
         q = matrix(-2.0*labels, tc='d')
@@ -91,7 +159,7 @@ class kernelSVM(kernelMethod):
         sol = solvers.qp(P,q,G,h,solver=solver)
         # Extract optimal value and solution
         self.alpha = np.asarray(sol['x'])
-    
+   
     def predict(self, data, stringsData=True):
         """Predict labels for data"""
         try:
@@ -105,17 +173,27 @@ class kernelSVM(kernelMethod):
         sv_K = build_kernel(data, self.data[sv_ind], self.kernel_fct, stringsData)
         # Use supvec alpha and supvec K to compute predictions
         return sv_K @ sv_alpha
-    
-    def assess(self, data, labels, metrics):
-        """Provides the performance of the algorithm on some test data"""
-        try:
-            assert len(data) == len(labels)
-        except AssertionError:
-            print('Error: Data and labels have different length')
-        labels = self.format_labels(labels).reshape((len(labels),1))
-        preds = self.predict(data)
-        m = {}
-        if metrics is not None:
-            for metric in metrics:
-                m[metric.name] = metric.measure(preds, labels)
-        return preds, m
+
+
+##################
+### KERNEL kNN ###
+##################
+
+class kernelKNN(kernelMethod):
+    def __init__(self, k):
+        self.k = k
+
+    def train(self, data, labels):
+        self.ref_data = data
+        self.ref_labels = labels
+
+    def predict(self, data, kernel_fct=None):
+        ##  first let's find kNN for all points in the dataset
+        if kernel_fct is None:
+            kernel_fct = linear_prod
+        self.kernel_fct = kernel_fct
+        K = build_kernel(data, self.ref_data, self.kernel_fct)
+        idx = (np.argsort(K.T, axis=1)[-self.k:]).T
+        labels = np.array(self.ref_labels)[idx]
+        bincount = np.apply_along_axis(lambda x: np.bincount(x, minlength=2), axis=1, arr=labels)
+        return np.argmax(bincount, axis=1)
