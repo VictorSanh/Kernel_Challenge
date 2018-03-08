@@ -63,7 +63,7 @@ def get_from_KWargs(kwargs, name, default=None):
     return default
 
 ## General method for k-fold cross validation
-def kfold(data, labels, n_folds, train_method, pred_method, format_labels, metric, **kwargs):
+def kfold(data, labels, n_folds, train_method, pred_method, metric, **kwargs):
     try:
         assert n_folds > 1
     except AssertionError:
@@ -93,7 +93,7 @@ def kfold(data, labels, n_folds, train_method, pred_method, format_labels, metri
         train_method(train_data, train_labels, **kwargs)
 
         preds = pred_method(val_data, **kwargs)
-        res.append(metric.measure(np.ravel(preds), format_labels(val_labels)))
+        res.append(metric.measure(np.ravel(preds), val_labels))
         print('Fold {0:d}, {1:s}: {2:.2f}'.format(fold,metric.name,res[fold]))
 
     print('Done! Average {0:s} is {1:.2f}'.format(metric.name,np.mean(res)))
@@ -119,7 +119,7 @@ class kernelMethod():
 
     def assess(self, data, labels, n_folds=1, kernel_fct=None, solver=None, stringsData=True, metric=m_binary):
         if n_folds > 1:
-            return kfold(data, labels, n_folds, self.train, self.predict, self.format_labels, metric, stringsData=stringsData, kernel_fct=kernel_fct, solver=solver)    
+            return kfold(data, labels, n_folds, self.train, self.predict, metric, format_labels=self.format_labels, stringsData=stringsData, kernel_fct=kernel_fct, solver=solver)    
 
 
 ##################
