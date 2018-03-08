@@ -63,7 +63,7 @@ def get_from_KWargs(kwargs, name, default=None):
     return default
 
 ## General method for k-fold cross validation
-def kfold(data, labels, n_folds, train_method, pred_method, metric, **kwargs):
+def kfold(data, labels, n_folds, train_method, pred_method, classify_method, metric, target_folds, **kwargs):
     try:
         assert n_folds > 1
     except AssertionError:
@@ -83,6 +83,9 @@ def kfold(data, labels, n_folds, train_method, pred_method, metric, **kwargs):
 
     res = []
     for fold in range(n_folds):
+        if target_folds is not None and fold not in target_folds:
+            res.append(np.nan)
+            continue
         val_idx = range(fold*fold_size,(fold+1)*fold_size)
         val_data = np.array(data[val_idx])
         val_labels = np.array(labels[val_idx])
@@ -93,11 +96,14 @@ def kfold(data, labels, n_folds, train_method, pred_method, metric, **kwargs):
         train_method(train_data, train_labels, **kwargs)
 
         preds = pred_method(val_data, **kwargs)
+        
+        if metric.quantized:
+            preds = classify_method(preds)
         res.append(metric.measure(np.ravel(preds), val_labels))
         print('Fold {0:d}, {1:s}: {2:.2f}'.format(fold,metric.name,res[fold]))
 
-    print('Done! Average {0:s} is {1:.2f}'.format(metric.name,np.mean(res)))
-    return np.mean(res)
+    print('Done! Average {0:s} is {1:.2f}'.format(metric.name,np.nanmean(res)))
+    return np.nanmean(res)
 
 
 ###################################
@@ -117,9 +123,37 @@ class kernelMethod():
     def predict(self, data, **kwargs):
         pass
 
-    def assess(self, data, labels, n_folds=1, kernel_fct=None, solver=None, stringsData=True, metric=m_binary):
+    def classify(self, preds):
+        return preds
+
+    def assess(self, data, labels, n_folds=1, kernel_fct=None, solver=None, stringsData=True, metric=m_binary, target_folds=None):
         if n_folds > 1:
-            return kfold(data, labels, n_folds, self.train, self.predict, metric, format_labels=self.format_labels, stringsData=stringsData, kernel_fct=kernel_fct, solver=solver)    
+            return kfold(data, labels, n_folds, self.train, self.predict, self.classify, metric, target_folds, format_labels=self.format_labels, stringsData=stringsData, kernel_fct=kernel_fct, solver=solver)    
+
+    def grid_search(self, data, labels, hyperparameter, search_min, search_max, search_count, n_folds=None, scale='linear', folds_per_search=1, kernel_fct=None):
+        try:
+            assert search_count > 1
+            assert search_max > search_min
+            assert folds_per_search > 0
+        except AssertionError:
+            print('One of arguments provided to grid-search is incorrect')
+
+        grid = []
+        total_folds = search_count*folds_per_search
+        if n_folds is None:
+            n_folds = total_folds
+
+        for it in range(search_count):
+            if scale == 'log':
+                param = search_min*np.power(search_max*1.0/search_min,it*1.0/(search_count-1))
+            else:
+                param = search_min + it*1.0/(search_count-1)
+
+            t_folds = np.remainder(range(it*folds_per_search,(it+1)*folds_per_search),n_folds-1)
+            hyperparameter = param
+            grid.append({'value':param, 'folds':t_folds ,'score':self.assess(data, labels, n_folds, kernel_fct, solver=None, stringsData=False, metric=m_binary, target_folds=t_folds)})
+
+        return grid
 
 
 ##################
@@ -188,6 +222,12 @@ class kernelSVM(kernelMethod):
         # Use supvec alpha and supvec K to compute predictions
         return sv_K @ sv_alpha
 
+    def classify(self, preds):
+            return self.format_labels(preds)
+
+    def grid_search(self, data, labels, search_min, search_max, search_count, n_folds=None, scale='linear', folds_per_search=1, kernel_fct=None):
+        return super().grid_search(data, labels, self.lbda, search_min, search_max, search_count, n_folds, scale, folds_per_search, kernel_fct)
+
 
 ##################
 ### KERNEL kNN ###
@@ -211,3 +251,6 @@ class kernelKNN(kernelMethod):
         labels = np.array(self.ref_labels)[idx]
         bincount = np.apply_along_axis(lambda x: np.bincount(x, minlength=2), axis=1, arr=labels)
         return np.argmax(bincount, axis=1)
+
+    def grid_search(self, data, labels, search_min, search_max, search_count, n_folds=None, scale='linear', folds_per_search=1, kernel_fct=None):
+        return super().grid_search(data, labels, self.k, search_min, search_max, search_count, n_folds, scale, folds_per_search, kernel_fct)
