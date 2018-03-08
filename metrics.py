@@ -2,6 +2,16 @@
 import numpy as np
 import pdb
 
+
+def sign_labels(labels):
+        try:
+            assert len(np.unique(labels)) == 2
+        except AssertionError:
+            print('Error: Labels provided are not binary')
+        lm,lM = np.min(labels), np.max(labels)
+        l = (labels==lM).astype(int) - (labels==lm).astype(int)
+        return l
+
 ## Squared loss
 def ls_squared(preds, labels):
     """Returns the hinge loss for preds %labels"""
@@ -15,7 +25,8 @@ def ls_squared(preds, labels):
 ## 0/1 loss
 def ls_binary(preds, labels):
     """Returns the 0/1 loss for preds %labels"""
-    preds = np.sign(preds)
+    preds = sign_labels(preds)
+    labels = sign_labels(labels)
     return ls_squared(0.5*preds, 0.5*labels)
 
 ## Hinge loss
