@@ -2,7 +2,6 @@
 import numpy as np
 from numpy.core.defchararray import not_equal
 
-
 ###################
 ##### HAMMING #####
 def hamming_distance(source, target):
@@ -11,6 +10,8 @@ def hamming_distance(source, target):
 
 def hamming_kernel(source, target):
     """Return the value of a K(s,t) where K is kernel defined from Hamming distance"""
+    source = list(source)
+    target = list(target)
     if len(source) != len(target):
         raise ValueError("Undefined for sequences of unequal length")
     if len(source) == 0:
@@ -21,6 +22,8 @@ def hamming_kernel(source, target):
 #######################
 ##### LEVENSHTEIN #####
 def levenshtein_distance(source, target):
+    source = list(source)
+    target = list(target)
     if len(source) < len(target):
         return levenshtein(target, source)
 

@@ -1,13 +1,15 @@
 ## Data manipulation
 import numpy as np
+import pdb
 
 ## Squared loss
 def ls_squared(preds, labels):
     """Returns the hinge loss for preds %labels"""
+    pdb.set_trace()
     try:
         assert len(preds) == len(labels)
     except AssertionError:
-        print('preds and labels have different length')
+        print('Error: preds and labels have different lengths')
     n_samples = len(preds)
     return (1.0*np.power(np.linalg.norm(preds-labels),2)) / n_samples
 
@@ -23,7 +25,7 @@ def ls_hinge(preds, labels):
     try:
         assert len(preds) == len(labels)
     except AssertionError:
-        print('preds and labels have different length')
+        print('Error: reds and labels have different lengths')
     n_samples = len(preds)
     return np.mean(
         np.maximum(
