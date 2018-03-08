@@ -5,7 +5,6 @@ import pdb
 ## Squared loss
 def ls_squared(preds, labels):
     """Returns the hinge loss for preds %labels"""
-    pdb.set_trace()
     try:
         assert len(preds) == len(labels)
     except AssertionError:

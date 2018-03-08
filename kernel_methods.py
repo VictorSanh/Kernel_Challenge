@@ -37,7 +37,7 @@ def build_kernel(arr1, arr2, kernel_fct, stringsData=True, verbose=True):
     tick = time.time()
     
     if stringsData:
-        K = cdist(arr1, arr2, lambda u, v: kernel_fct(list(u[0]),list(v[0])))
+        K = cdist(arr1, arr2, lambda u, v: kernel_fct(u[0],v[0]))
     else:
         K = cdist(arr1, arr2, kernel_fct)
     
@@ -55,10 +55,17 @@ def linear_prod(x1, x2):
     return np.dot(t1,t2)
 
 
+## Variable assignement from kwargs
+def get_from_KWargs(kwargs, name, default=None):
+    if name in kwargs:
+        if kwargs[name] is not None:
+            return kwargs[name]
+    return default
+
 ## General method for k-fold cross validation
-def kfold(data, labels, n_folds, train_method, pred_method, format_labels, metric, stringsData, **kwargs):
+def kfold(data, labels, n_folds, train_method, pred_method, format_labels, metric, **kwargs):
     try:
-        n_folds > 1
+        assert n_folds > 1
     except AssertionError:
         print('Need more than one fold')
 
@@ -69,6 +76,7 @@ def kfold(data, labels, n_folds, train_method, pred_method, format_labels, metri
     
     print('Engaging n-fold cross validation with {0:d} folds on {1:d} items'.format(n_folds, len(data)))    
     fold_size = int(len(data)/n_folds)
+    # Random permuation of the data
     perm = np.random.permutation(len(data))
     data = data[perm]
     labels = labels[perm]
@@ -84,7 +92,7 @@ def kfold(data, labels, n_folds, train_method, pred_method, format_labels, metri
 
         train_method(train_data, train_labels, **kwargs)
 
-        preds = pred_method(val_data, stringsData)
+        preds = pred_method(val_data, **kwargs)
         res.append(metric.measure(np.ravel(preds), format_labels(val_labels)))
         print('Fold {0:d}, {1:s}: {2:.2f}'.format(fold,metric.name,res[fold]))
 
@@ -98,20 +106,20 @@ def kfold(data, labels, n_folds, train_method, pred_method, format_labels, metri
 
 class kernelMethod():
     def __init__(self):
-        return 0
+        pass
 
     def format_labels(self, labels):
         return labels
 
-    def train(self, data, labels, kernel_fct=None, solver=None, stringsData=True):
-        return
+    def train(self, data, labels, kernel_fct=None, solver=None, stringsData=True, **kwargs):
+        pass
 
-    def predict(self, data):
-        return
+    def predict(self, data, **kwargs):
+        pass
 
     def assess(self, data, labels, n_folds=1, kernel_fct=None, solver=None, stringsData=True, metric=m_binary):
         if n_folds > 1:
-            return kfold(data, labels, n_folds, self.train, self.predict, self.format_labels, metric, stringsData, kernel_fct=kernel_fct, solver=solver)    
+            return kfold(data, labels, n_folds, self.train, self.predict, self.format_labels, metric, stringsData=stringsData, kernel_fct=kernel_fct, solver=solver)    
 
 
 ##################
@@ -135,11 +143,14 @@ class kernelSVM(kernelMethod):
         l = (labels==lM).astype(int) - (labels==lm).astype(int)
         return l
     
-    def train(self, data, labels, kernel_fct=None, solver=None, stringsData=True):
+    def train(self, data, labels, **kwargs):
         """Trains the kernel SVM on data and labels"""
         # Default kernel will be linear (only works in for finite-dim floats space)
-        if kernel_fct is None:
-            kernel_fct = linear_prod
+        kernel_fct = get_from_KWargs(kwargs, 'kernel_fct', linear_prod)
+        stringsData = get_from_KWargs(kwargs, 'stringsData', True)
+        solver = get_from_KWargs(kwargs, 'solver', 'cvxopt')
+        reg = get_from_KWargs(kwargs, 'reg', 0)
+
         n_samples = labels.shape[0]
         # Turning labels into ±1
         labels = self.format_labels(labels)
@@ -147,9 +158,9 @@ class kernelSVM(kernelMethod):
         self.kernel_fct = kernel_fct
         self.data = data
         # Building matrices for solving dual problem
-        K = build_kernel(data, data, kernel_fct, stringsData) 
+        K = build_kernel(data, data, kernel_fct, stringsData)
         d = np.diag(labels)
-        P = matrix(2.0*K, tc='d')
+        P = matrix(2.0*K + reg*np.eye(n_samples), tc='d')
         q = matrix(-2.0*labels, tc='d')
         G = matrix(np.vstack((-d,d)), tc='d')
         h1 = np.zeros((n_samples,1))
@@ -160,13 +171,16 @@ class kernelSVM(kernelMethod):
         # Extract optimal value and solution
         self.alpha = np.asarray(sol['x'])
    
-    def predict(self, data, stringsData=True):
+    def predict(self, data, **kwargs):
         """Predict labels for data"""
         try:
             assert self.alpha is not None
             assert self.kernel_fct is not None
         except AssertionError:
             print('Error: No successful training recorded')
+
+        stringsData = get_from_KWargs(kwargs, 'stringsData', True)
+
         # Build sv alpha and sv K(x_i(new_data), x_j(ref))
         sv_ind = np.nonzero(self.alpha)[0]
         sv_alpha = self.alpha[sv_ind]
@@ -183,17 +197,17 @@ class kernelKNN(kernelMethod):
     def __init__(self, k):
         self.k = k
 
-    def train(self, data, labels):
+    def train(self, data, labels, **kwargs):
         self.ref_data = data
         self.ref_labels = labels
 
-    def predict(self, data, kernel_fct=None):
+    def predict(self, data, **kwargs):
         ##  first let's find kNN for all points in the dataset
-        if kernel_fct is None:
-            kernel_fct = linear_prod
+        kernel_fct = get_from_KWargs(kwargs, 'kernel_fct', linear_prod)
+
         self.kernel_fct = kernel_fct
-        K = build_kernel(data, self.ref_data, self.kernel_fct)
-        idx = (np.argsort(K.T, axis=1)[-self.k:]).T
+        K = build_kernel(data, self.ref_data, self.kernel_fct, stringsData=False)
+        idx = (np.argsort(K)[:,-self.k:])
         labels = np.array(self.ref_labels)[idx]
         bincount = np.apply_along_axis(lambda x: np.bincount(x, minlength=2), axis=1, arr=labels)
         return np.argmax(bincount, axis=1)
