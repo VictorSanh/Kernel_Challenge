@@ -63,7 +63,7 @@ def get_from_KWargs(kwargs, name, default=None):
     return default
 
 ## General method for k-fold cross validation
-def kfold(data, labels, n_folds, train_method, pred_method, metric, **kwargs, verbose = True):
+def kfold(data, labels, n_folds, train_method, pred_method, metric, verbose = True, **kwargs):
     try:
         assert n_folds > 1
     except AssertionError:
