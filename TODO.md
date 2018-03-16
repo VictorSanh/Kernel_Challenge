@@ -10,3 +10,7 @@ Algos de classi
 
 A implémenter:
 - Logistic regression
+
+Idées pour les next steps:
+- sum of kernels: trouver plus de features cohérents, réessayer les méthodes qu'on a déjà sur ces nouveaux vecteurs
+- si on se chauffe et qu'on pense avoir suffisamment de kernel pour capturer la structure du pb, du multiple kernel learning...
