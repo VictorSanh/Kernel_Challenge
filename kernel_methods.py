@@ -270,7 +270,6 @@ class kernelKNN(kernelMethod):
 ### KERNEL LOGISTIC REGRESSION ###
 ##################################
 def sigmoid(x):
-	'''Sigmoid function'''
     z = 1.0/(1.0 + np.exp(-x))
     return z
 
