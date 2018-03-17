@@ -74,7 +74,7 @@ def kfold(data, labels, n_folds, train_method, pred_method, classify_method, met
     except AssertionError:
         print('Error: Data and labels have different length')  
     
-    print('Engaging n-fold cross validation with {0:d} folds on {1:d} items'.format(n_folds, len(data)))    
+    if verbose: print('Engaging n-fold cross validation with {0:d} folds on {1:d} items'.format(n_folds, len(data)))    
     fold_size = int(len(data)/n_folds)
     # Random permuation of the data
     perm = np.random.permutation(len(data))
@@ -100,7 +100,7 @@ def kfold(data, labels, n_folds, train_method, pred_method, classify_method, met
         if metric.quantized:
             preds = classify_method(preds)
         res.append(metric.measure(np.ravel(preds), val_labels))
-        print('Fold {0:d}, {1:s}: {2:.2f}'.format(fold,metric.name,res[fold]))
+        if verbose: print('Fold {0:d}, {1:s}: {2:.2f}'.format(fold,metric.name,res[fold]))
 
     print('Done! Average {0:s} is {1:.2f}'.format(metric.name,np.nanmean(res)))
     return np.nanmean(res)
