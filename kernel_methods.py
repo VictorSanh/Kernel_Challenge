@@ -14,6 +14,7 @@ from scipy.spatial.distance import cdist
 
 ## Importing self-made fcts
 from metrics import *
+from kernels import *
 
 ## Debugging
 import pdb
@@ -63,7 +64,7 @@ def get_from_KWargs(kwargs, name, default=None):
     return default
 
 ## General method for k-fold cross validation
-def kfold(data, labels, n_folds, train_method, pred_method, classify_method, metric, target_folds, **kwargs):
+def kfold(data, labels, n_folds, train_method, pred_method, classify_method, labels_formatting, metric, target_folds, verbose=True, **kwargs):
     try:
         assert n_folds > 1
     except AssertionError:
@@ -99,10 +100,11 @@ def kfold(data, labels, n_folds, train_method, pred_method, classify_method, met
         
         if metric.quantized:
             preds = classify_method(preds)
-        res.append(metric.measure(np.ravel(preds), val_labels))
+        res.append(metric.measure(np.ravel(preds), labels_formatting(val_labels)))
         if verbose: print('Fold {0:d}, {1:s}: {2:.2f}'.format(fold,metric.name,res[fold]))
 
-    print('Done! Average {0:s} is {1:.2f}'.format(metric.name,np.nanmean(res)))
+    if verbose: print('Done! Average {0:s} is {1:.2f}'.format(metric.name,np.nanmean(res)))
+
     return np.nanmean(res)
 
 
@@ -126,9 +128,15 @@ class kernelMethod():
     def classify(self, preds):
         return preds
 
-    def assess(self, data, labels, n_folds=1, kernel_fct=None, solver=None, stringsData=True, metric=m_binary, target_folds=None):
+    def assess(self, data, labels, n_folds=1, kernel_fct=None, solver=None, stringsData=True, metric=m_binary, target_folds=None, verbose=True):
         if n_folds > 1:
-            return kfold(data, labels, n_folds, self.train, self.predict, self.classify, metric, target_folds, format_labels=self.format_labels, stringsData=stringsData, kernel_fct=kernel_fct, solver=solver)    
+            return kfold(data, labels, n_folds, self.train, self.predict, self.classify, self.format_labels, metric, target_folds, verbose, format_labels=self.format_labels, stringsData=stringsData, kernel_fct=kernel_fct, solver=solver)    
+        if n_folds == 1:
+            self.train(data, labels, kernel_fct, solver, stringsData)
+            preds = self.predict(data)
+            if metric.quantized:
+                preds = classify_method(preds)
+            return metric.measure(np.ravel(preds), labels_formatting(val_labels))
 
     def grid_search(self, data, labels, hyperparameter, search_min, search_max, search_count, n_folds=None, scale='linear', folds_per_search=1, kernel_fct=None):
         try:
@@ -150,8 +158,8 @@ class kernelMethod():
                 param = search_min + it*1.0/(search_count-1)
 
             t_folds = np.remainder(range(it*folds_per_search,(it+1)*folds_per_search),n_folds-1)
-            hyperparameter = param
-            grid.append({'value':param, 'folds':t_folds ,'score':self.assess(data, labels, n_folds, kernel_fct, solver=None, stringsData=False, metric=m_binary, target_folds=t_folds)})
+            setattr(self, hyperparameter, param)
+            grid.append({'value':param, 'folds':t_folds ,'score':self.assess(data, labels, n_folds, kernel_fct, solver=None, stringsData=False, metric=m_binary, target_folds=t_folds, verbose=False)})
 
         return grid
 
@@ -184,6 +192,7 @@ class kernelSVM(kernelMethod):
         stringsData = get_from_KWargs(kwargs, 'stringsData', True)
         solver = get_from_KWargs(kwargs, 'solver', 'cvxopt')
         reg = get_from_KWargs(kwargs, 'reg', 0)
+        verbose = get_from_KWargs(kwargs, 'verbose', False)
 
         n_samples = labels.shape[0]
         # Turning labels into ±1
@@ -192,7 +201,7 @@ class kernelSVM(kernelMethod):
         self.kernel_fct = kernel_fct
         self.data = data
         # Building matrices for solving dual problem
-        K = build_kernel(data, data, kernel_fct, stringsData)
+        K = build_kernel(data, data, kernel_fct, stringsData, verbose)
         d = np.diag(labels)
         P = matrix(2.0*K + reg*np.eye(n_samples), tc='d')
         q = matrix(-2.0*labels, tc='d')
@@ -214,19 +223,20 @@ class kernelSVM(kernelMethod):
             print('Error: No successful training recorded')
 
         stringsData = get_from_KWargs(kwargs, 'stringsData', True)
+        verbose = get_from_KWargs(kwargs, 'verbose', False)
 
         # Build sv alpha and sv K(x_i(new_data), x_j(ref))
         sv_ind = np.nonzero(self.alpha)[0]
         sv_alpha = self.alpha[sv_ind]
-        sv_K = build_kernel(data, self.data[sv_ind], self.kernel_fct, stringsData)
+        sv_K = build_kernel(data, self.data[sv_ind], self.kernel_fct, stringsData, verbose)
         # Use supvec alpha and supvec K to compute predictions
         return sv_K @ sv_alpha
 
     def classify(self, preds):
-            return self.format_labels(preds)
+        return np.sign(preds).astype(int)
 
     def grid_search(self, data, labels, search_min, search_max, search_count, n_folds=None, scale='linear', folds_per_search=1, kernel_fct=None):
-        return super().grid_search(data, labels, self.lbda, search_min, search_max, search_count, n_folds, scale, folds_per_search, kernel_fct)
+        return super().grid_search(data, labels, 'lbda', search_min, search_max, search_count, n_folds, scale, folds_per_search, kernel_fct)
 
 
 ##################
@@ -253,4 +263,4 @@ class kernelKNN(kernelMethod):
         return np.argmax(bincount, axis=1)
 
     def grid_search(self, data, labels, search_min, search_max, search_count, n_folds=None, scale='linear', folds_per_search=1, kernel_fct=None):
-        return super().grid_search(data, labels, self.k, search_min, search_max, search_count, n_folds, scale, folds_per_search, kernel_fct)
+        return super().grid_search(data, labels, 'k', search_min, search_max, search_count, n_folds, scale, folds_per_search, kernel_fct)
