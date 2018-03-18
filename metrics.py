@@ -46,8 +46,9 @@ def ls_hinge(preds, labels):
 
 ## Building metrics for reporting on performance
 class Metric():
-    def __init__(self, name, measure):
+    def __init__(self, name, measure, quantized=False):
         self.name = name
         self.measure = measure
-        
-m_binary = Metric('Match rate', lambda preds,labels: 1 - ls_binary(preds,labels))
+        self.quantized = quantized
+
+m_binary = Metric('Match rate', lambda preds,labels: 1 - ls_binary(preds,labels), quantized=True)
