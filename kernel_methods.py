@@ -289,7 +289,7 @@ class kernelLogisticRegression(kernelMethod):
         l = (labels==lM).astype(int) - (labels==lm).astype(int)
         return l
     
-    def train(self, data, labels, max_iter = 10000, cvg_threshold = 1e-7, **kwargs):
+    def train(self, data, labels, max_iter = 10000, cvg_threshold = 1e-6, **kwargs):
         """Trains the kernel Logistic Regression on data and labels"""
         # Default kernel will be linear (only works in for finite-dim floats space)
         kernel_fct = get_from_KWargs(kwargs, 'kernel_fct', linear_prod)
