@@ -1,15 +1,17 @@
-Features et kernels
+Features et kernels 
 - ~~Features Spectrum Kernel + Optimisation -> Victor~~
-- Mismatch substring -> Simon + Victor
-- Naive Bayes -> Victor + Simon (kfold)
+- ~~Mismatch substring -> Simon + Victor~~
+- ~~Naive Bayes -> Victor + Simon (kfold)~~
+- Substring Kernel
 
 Algos de classi
 - ~~Plus proche voisin sur un jeu de features -> Simon~~
 - ~~Cross validation -> Simon~~
-- kSVM à débugguer -> Simon + Victor
+- ~~kSVM à débugguer -> Simon + Victor~~
 
 A implémenter:
-- Logistic regression
+- ~~Logistic regression~~
+- Fichier start.py -> Victor
 
 Idées pour les next steps:
 - sum of kernels: trouver plus de features cohérents, réessayer les méthodes qu'on a déjà sur ces nouveaux vecteurs
