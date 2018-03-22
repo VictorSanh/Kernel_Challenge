@@ -16,3 +16,17 @@ def load_data(dsID, set_type='tr', folder_name='data'):
 
 def format_preds(preds):
     return (0.5*(1+np.sign(preds))).astype(int)
+
+
+def data_normalization(data, offset_column=False):
+    d_mean = np.mean(data, axis=0)
+    d_std = np.std(data, axis=0)
+    data = (data - d_mean)/d_std
+    if offset_column:
+        data = np.hstack((data,np.ones((len(data),1))))
+    return data
+
+
+def voting(preds, wghts):
+    votes =  np.average(preds, axis=1, weights=wghts)
+    return 0.5*(1 + np.sign(votes-0.5))
