@@ -6,6 +6,7 @@ import itertools
 from kernel_methods import *
 from kernels import *
 from data_handler import *
+from LogisticRegression import *
 
 
 
@@ -30,22 +31,22 @@ if __name__ == '__main__':
 	X_train = np.zeros((len(data_train), len(dictionary)))
 	for idx, seq in enumerate(data_train['Sequence']):
 		X_train[idx, :] = create_occ_feature(seq, substring_length, dictionary, normalize = False)
-	X_train = np.hstack((X_train, np.ones((X_train.shape[0], 1)))) #Add intercept
 	
 	X_test = np.zeros((len(data_test), len(dictionary)))
 	for idx, seq in enumerate(data_test['Sequence']):
 		X_test[idx, :] = create_occ_feature(seq, substring_length, dictionary, normalize = False)
-	X_test = np.hstack((X_test, np.ones((X_test.shape[0], 1)))) #Add intercept
 	
 	#Train
-	regu = 0.01
-	kLGR = kernelLogisticRegression(regu)
-	kLGR.train(X_train, Y_train, kernel_fct = linear_prod, stringsData = False)
+	#regu = 0.01
+	#kLGR = kernelLogisticRegression(regu)
+	#kLGR.train(X_train, Y_train, kernel_fct = linear_prod, stringsData = False)
+	logreg = LogisticRegression(lbda = 150)
+	logreg.train(X_train, Y_train)
 	
 	#Predict
-	preds = kLGR.predict(X_test, kernel_fct = linear_prod, stringsData = False)
-	te0_raw = kLGR.classify(preds)
-
+	#preds = kLGR.predict(X_test, kernel_fct = linear_prod, stringsData = False)
+	#te0_raw = kLGR.classify(preds)
+	te0_raw = logreg.predict(X_test)
 		
 	
 		

@@ -289,7 +289,7 @@ class kernelLogisticRegression(kernelMethod):
         l = (labels==lM).astype(int) - (labels==lm).astype(int)
         return l
     
-    def train(self, data, labels, max_iter = 10000, cvg_threshold = 1e-6, **kwargs):
+    def train(self, data, labels, max_iter = 10000, cvg_threshold = 1e-4, **kwargs):
         """Trains the kernel Logistic Regression on data and labels"""
         # Default kernel will be linear (only works in for finite-dim floats space)
         kernel_fct = get_from_KWargs(kwargs, 'kernel_fct', linear_prod)
@@ -311,7 +311,7 @@ class kernelLogisticRegression(kernelMethod):
         K = build_kernel(data, data, kernel_fct, stringsData)
         
         #Initialization
-        alpha_t = np.random.rand(n_samples)
+        alpha_t = 0.001*np.random.normal(0,1,n_samples)
 
         for i in range(self.max_iter):
             m_t = np.dot(K, alpha_t) #Shape: n x 1
@@ -325,7 +325,7 @@ class kernelLogisticRegression(kernelMethod):
             temp = np.linalg.inv(temp) #Shape n x n
             alpha_next = np.dot(W_sqrt_matrix.dot(temp.dot(W_sqrt_matrix)), labels) #Shape n x 1
 
-            if np.linalg.norm(alpha_next - alpha_t)/np.linalg.norm(alpha_t) < self.cvg_threshold:
+            if np.linalg.norm(alpha_next - alpha_t) < np.linalg.norm(alpha_t)*self.cvg_threshold:
                 #print('Cvg achieved after {} iterations'.format(i))
                 break
             else:
