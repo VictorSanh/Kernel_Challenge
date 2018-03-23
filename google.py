@@ -8,9 +8,9 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import cross_val_score
 from sklearn.neural_network import MLPClassifier
 
-%run data_handler.py
-%run kernels.py
-%run kernel_methods.py
+from data_handler import *
+from kernels import *
+from kernel_methods import *
 
 
 tr2 = load_data(2, 'tr')
