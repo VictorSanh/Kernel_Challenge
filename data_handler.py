@@ -17,6 +17,10 @@ def load_data(dsID, set_type='tr', folder_name='data'):
         df = X
     return df
 
+def load_datafeats(dsID, set_type='tr', folder_name='data'):
+    Xdata_file = folder_name + '/X' + set_type + str(dsID) + '_mat50.csv'
+    df = pd.read_csv(Xdata_file, header=None, sep=" ")
+    return df.as_matrix()
 
 def format_preds(preds):
     return (0.5*(1+np.sign(preds))).astype(int)
@@ -35,9 +39,12 @@ def data_normalization(data, offset_column=False):
 # to potentially do better than all #
 #####################################
 
-def voting(preds, wghts):
+def voting(preds, wghts, stochastic=False):
     votes =  np.average(preds, axis=1, weights=wghts)
-    return 0.5*(1 + np.sign(votes-0.5))
+    if stochastic:
+    	return np.random.binomial(1, p=votes).astype(int)
+    else:
+    	return (0.5*(1 + np.sign(votes-0.5))).astype(int)
 
 
 ##########################################
