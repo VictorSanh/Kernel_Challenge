@@ -28,13 +28,8 @@ if __name__ == '__main__':
 	dictionary = create_dictionary(data_train['Sequence'], substring_length)
 
 	#Create spectrum features
-	X_train = np.zeros((len(data_train), len(dictionary)))
-	for idx, seq in enumerate(data_train['Sequence']):
-		X_train[idx, :] = create_occ_feature(seq, substring_length, dictionary, normalize = False)
-	
-	X_test = np.zeros((len(data_test), len(dictionary)))
-	for idx, seq in enumerate(data_test['Sequence']):
-		X_test[idx, :] = create_occ_feature(seq, substring_length, dictionary, normalize = False)
+	X_train = np.apply_along_axis(lambda seq_A: create_occ_feature(seq_A[0], substring_length, dictionary, normalize=False), axis=1, arr=data_train['Sequence'].as_matrix().reshape(2000,1))
+	X_test = np.apply_along_axis(lambda seq_A: create_occ_feature(seq_A[0], substring_length, dictionary, normalize=False), axis=1, arr=data_test['Sequence'].as_matrix().reshape(1000,1))
 	
 	#Train
 	#regu = 0.01
@@ -67,14 +62,9 @@ if __name__ == '__main__':
 	neighbours = compute_neighbours(vocab2index, mismatch_tol)
 	
 	#Create mismatch features
-	X_train = np.zeros((len(data_train), len(vocab2index)))
-	for idx, seq in enumerate(data_train['Sequence']):
-		X_train[idx, :] = create_mismatch_feature(seq, substring_length, vocab2index, neighbours, normalize = False)
+	X_train = np.apply_along_axis(lambda seq_A: create_mismatch_feature(seq_A[0], substring_length, vocab2index, neighbours, normalize=False), axis=1, arr=data_train['Sequence'].as_matrix().reshape(2000,1))
+	X_test = np.apply_along_axis(lambda seq_A: create_mismatch_feature(seq_A[0], substring_length, vocab2index, neighbours, normalize=False), axis=1, arr=data_test['Sequence'].as_matrix().reshape(1000,1))
 	
-	X_test = np.zeros((len(data_test), len(vocab2index)))
-	for idx, seq in enumerate(data_test['Sequence']):
-		X_test[idx, :] = create_mismatch_feature(seq, substring_length, vocab2index, neighbours, normalize = False)	
-		
 	#Train
 	lbda = 1
 	kSVM = kernelSVM(lbda)
@@ -104,13 +94,8 @@ if __name__ == '__main__':
 	neighbours = compute_neighbours(vocab2index, mismatch_tol)
 	
 	#Create mismatch features
-	X_train = np.zeros((len(data_train), len(vocab2index)))
-	for idx, seq in enumerate(data_train['Sequence']):
-		X_train[idx, :] = create_mismatch_feature(seq, substring_length, vocab2index, neighbours, normalize = False)
-	
-	X_test = np.zeros((len(data_test), len(vocab2index)))
-	for idx, seq in enumerate(data_test['Sequence']):
-		X_test[idx, :] = create_mismatch_feature(seq, substring_length, vocab2index, neighbours, normalize = False)	
+	X_train = np.apply_along_axis(lambda seq_A: create_mismatch_feature(seq_A[0], substring_length, vocab2index, neighbours, normalize=False), axis=1, arr=data_train['Sequence'].as_matrix().reshape(2000,1))
+	X_test = np.apply_along_axis(lambda seq_A: create_mismatch_feature(seq_A[0], substring_length, vocab2index, neighbours, normalize=False), axis=1, arr=data_test['Sequence'].as_matrix().reshape(1000,1))
 		
 	#Train
 	lbda = 1
