@@ -9,13 +9,6 @@ pip3 install -r requirements.txt
 
 ##### PACKAGES - NOTES #####
 
-## Special instructions for Mosek
-Mosek is a powerful optimization package:
-https://www.mosek.com/
-A free academic license can be downloaded at:
-https://www.mosek.com/products/academic-licenses/
-The package provides useful feedback on optimization performance and detailed debugging feedback.
-
 ## How to use k-fold cross-validation
 
 - If you are using a kernelMethod class (for instance kernelSVM or kernelKNN), just use method assess():

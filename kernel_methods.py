@@ -8,7 +8,6 @@ import time
 from cvxopt import matrix
 from cvxopt import solvers
 solvers.options['show_progress'] = False
-import mosek
 
 from scipy.spatial.distance import cdist
 
